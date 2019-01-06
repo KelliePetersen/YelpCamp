@@ -1,27 +1,16 @@
 const express = require("express"),
       app = express(),
       bodyParser = require("body-parser"),
-      mongoose = require("mongoose");
+      mongoose = require("mongoose"),
+      Campground = require("./models/campground"),
+      Comment = require("./models/comment"),
+      seedDB = require("./seeds");
 
 mongoose.connect("mongodb://localhost:27017/yelp_camp", {useNewUrlParser: true});
 app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
-
-// SCHEMA
-const campgroundsSchema = new mongoose.Schema({
-  name: String,
-  image: String,
-  description: String
-});
-
-const Campground = mongoose.model("Campground", campgroundsSchema);
-
-// Campground.create({ 
-//   name: "Honeydew Farm", 
-//   image: "https://images.pexels.com/photos/1061640/pexels-photo-1061640.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260",
-//   description: "A peaceful farmland filled with rolling hills and exciting forests. Sample the rich honey produced here by over 3 million bees!"
-//   }, (err, campground) => err ? console.log(err) : console.log(campground));
-
+app.use(express.static(__dirname + "/public"));
+seedDB();
 
 app.get("/", function(req, res) {
   res.render("landing");
@@ -29,7 +18,7 @@ app.get("/", function(req, res) {
 
 app.get("/campgrounds", function(req, res) {
   Campground.find({}, (err, allCampgrounds) => err ? console.log(err) :
-  res.render("index", {campgrounds:allCampgrounds}));
+  res.render("campgrounds/index", {campgrounds:allCampgrounds}));
 });
 
 app.post("/campgrounds", function(req, res) {
@@ -47,15 +36,45 @@ app.post("/campgrounds", function(req, res) {
 });
 
 app.get("/campgrounds/new", function(req, res) {
-  res.render("new");
+  res.render("campgrounds/new");
 });
 
 app.get("/campgrounds/:id", function(req, res) {
-  Campground.findById(req.params.id, function(err, foundCamp) {
+  Campground.findById(req.params.id).populate("comments").exec(function(err, foundCamp) {
     if (err) {
       console.log(err);
     } else {
-      res.render("show", {campground: foundCamp});
+      console.log(foundCamp);
+      res.render("campgrounds/show", {campground: foundCamp});
+    }
+  });
+});
+
+app.get("/campgrounds/:id/comments/new", function(req, res) {
+  Campground.findById(req.params.id, function(err, campground) {
+    if(err) {
+      console.log(err);
+    } else {
+      res.render("comments/new", {campground: campground});
+    }
+  });
+});
+
+app.post("/campgrounds/:id/comments", function(req, res) {
+  Campground.findById(req.params.id, function(err, campground) {
+    if (err) {
+      console.log(err);
+      res.redirect("/campgrounds");
+    } else {
+      Comment.create(req.body.comment, function(err, comment) {
+        if(err) {
+          console.log(err);
+        } else {
+          campground.comments.push(comment);
+          campground.save();
+          res.redirect(`/campgrounds/${campground._id}`);
+        }
+      });
     }
   });
 });
@@ -63,13 +82,3 @@ app.get("/campgrounds/:id", function(req, res) {
 app.listen(3000, function() {
   console.log("server has started");
 });
-
-
-
-
-// let campgrounds = [
-//   { name: "Snowy Mountains", image: "https://images.pexels.com/photos/176381/pexels-photo-176381.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260" },
-//   { name: "Ravenwood", image: "https://images.pexels.com/photos/776117/pexels-photo-776117.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260" },
-//   { name: "White River Creek", image: "https://images.pexels.com/photos/803226/pexels-photo-803226.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260" },
-//   { name: "Big Mountain", image: "https://images.pexels.com/photos/699558/pexels-photo-699558.jpeg?auto=compress&cs=tinysrgb&h=750&w=1260" }
-// ];
